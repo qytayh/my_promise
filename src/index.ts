@@ -10,13 +10,48 @@ const enum STATUS { // 存放所需要的状态
     rejected = 'REJECTED'
 }
 
-class Promise {
+// 核心逻辑 解析x的类型  决定promise2 走成功还是失败
+function resolvePromise(promise2, x, resolve, reject) {
+    // 判断x的值 决定promise2的关系   判断有可能x是别的第三方promise的x 可能第三方promise会出问题
+    if (x == promise2) {
+        return reject(new TypeError('type error'))
+    }
+    if ((typeof x === 'object' && x !== null) || typeof x === 'function') {
+        // 只有x是对象或函数 才可能是promise
+        let called = false // 表示没调用过成功/失败
+        try {
+            const then = x.then // 取x上的then
+            if(typeof then === "function"){
+                then.call(x,y=>{ 
+                    if(called) return
+                    called = true
+                    // y可能也是一个promise  递归解析 直到y是普通值
+                    resolvePromise(promise2, y, resolve, reject)
+                },r=>{
+                    if(called) return
+                    called = true
+                    reject(r)
+                })
+            }
+        } catch (error) {
+            if(called) return
+            called = true
+            reject(error) // 取then失败
+        }
+    } else {
+        // 如果不是 那一定是一个普通值
+        resolve(x)
+    }
+
+}
+
+class MyPromise {
     status: STATUS
     value: any
     reason: any
     onResolveCallbacks: Function[]
     onRejectedCallbacks: Function[]
-    constructor(executor) {
+    constructor(executor: (resolve: (value?: any) => void, reject: (reason?: any) => void) => void) {
         this.status = STATUS.pending // 当前默认状态
         this.value = undefined // 成功原因
         this.reason = undefined // 失败原因
@@ -45,44 +80,59 @@ class Promise {
     }
     then(onFulfilled, onRejected) {
         // 每次调用then都产生一个全新的promise
-        return new Promise((resolve, reject) => {
+        const promise2 = new MyPromise((resolve, reject) => {
             if (this.status == STATUS.fulfilled) {
-                try {
-                    resolve(onFulfilled(this.value)) // 用then的返回值 最为下次then的成功结果
-                } catch (e) {
-                    reject(e)
-                }
+                setTimeout(() => {
+                    try {
+                        const x = onFulfilled(this.value) // 用then的返回值 最为下次then的成功结果
+                        resolvePromise(promise2, x, resolve, reject)
+                    } catch (e) {
+                        reject(e)
+                    }
+                }, 0);
+
             }
             if (this.status == STATUS.rejected) {
-                try {
-                    resolve(onRejected(this.reason)) // 用then的返回值 最为下次then的成功结果
-                } catch (e) {
-                    reject(e)
-                }
+                setTimeout(() => {
+                    try {
+                        const x = onRejected(this.reason)// 用then的返回值 最为下次then的成功结果
+                        resolvePromise(promise2, x, resolve, reject)
+                    } catch (e) {
+                        reject(e)
+                    }
+                }, 0);
             }
             if (this.status == STATUS.pending) {
                 // 订阅
                 this.onResolveCallbacks.push(() => {  // 切片
                     // 可以增加额外逻辑
-                    try {
-                        resolve(onFulfilled(this.value)) // 用then的返回值 最为下次then的成功结果
-                    } catch (e) {
-                        reject(e)
-                    }
+                    setTimeout(() => {
+                        try {
+                            const x = onFulfilled(this.value)
+                            resolvePromise(promise2, x, resolve, reject)
+                        } catch (e) {
+                            reject(e)
+                        }
+                    }, 0);
                 })
                 this.onRejectedCallbacks.push(() => {
                     // 可以增加额外逻辑
-                    try {
-                        resolve(onRejected(this.reason)) // 用then的返回值 最为下次then的成功结果
-                    } catch (e) {
-                        reject(e)
-                    }
+                    setTimeout(() => {
+                        try {
+                            const x = onRejected(this.reason)
+                            resolvePromise(promise2, x, resolve, reject)
+                        } catch (e) {
+                            reject(e)
+                        }
+                    }, 0);
+
                 })
             }
         })
+        return promise2
     }
 
 
 }
 
-export default Promise
+export default MyPromise
