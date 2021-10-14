@@ -21,20 +21,22 @@ function resolvePromise(promise2, x, resolve, reject) {
         let called = false // 表示没调用过成功/失败
         try {
             const then = x.then // 取x上的then
-            if(typeof then === "function"){
-                then.call(x,y=>{ 
-                    if(called) return
+            if (typeof then === "function") {
+                then.call(x, y => {
+                    if (called) return
                     called = true
                     // y可能也是一个promise  递归解析 直到y是普通值
                     resolvePromise(promise2, y, resolve, reject)
-                },r=>{
-                    if(called) return
+                }, r => {
+                    if (called) return
                     called = true
                     reject(r)
                 })
+            }else{
+                resolve(x) // 普通对象
             }
         } catch (error) {
-            if(called) return
+            if (called) return
             called = true
             reject(error) // 取then失败
         }
@@ -46,6 +48,7 @@ function resolvePromise(promise2, x, resolve, reject) {
 }
 
 class MyPromise {
+    static deferred
     status: STATUS
     value: any
     reason: any
@@ -78,7 +81,9 @@ class MyPromise {
             reject(e)
         }
     }
-    then(onFulfilled, onRejected) {
+    then(onFulfilled?, onRejected?) {
+        onFulfilled = typeof onFulfilled == "function" ? onFulfilled : val => val
+        onRejected = typeof onRejected == "function" ? onRejected : err => {throw err}
         // 每次调用then都产生一个全新的promise
         const promise2 = new MyPromise((resolve, reject) => {
             if (this.status == STATUS.fulfilled) {
@@ -131,8 +136,15 @@ class MyPromise {
         })
         return promise2
     }
+}
 
-
+MyPromise.deferred = function () {
+    let dfd = {} as any
+    dfd.promise = new MyPromise((resolve, reject) => {
+        dfd.resolve = resolve
+        dfd.reject = reject
+    })
+    return dfd
 }
 
 export default MyPromise
