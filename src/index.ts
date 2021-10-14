@@ -14,35 +14,72 @@ class Promise {
     status: STATUS
     value: any
     reason: any
+    onResolveCallbacks: Function[]
+    onRejectedCallbacks: Function[]
     constructor(executor) {
         this.status = STATUS.pending // 当前默认状态
         this.value = undefined // 成功原因
         this.reason = undefined // 失败原因
+        this.onResolveCallbacks = []
+        this.onRejectedCallbacks = []
         const resolve = (value?: any) => {
             if (this.status === STATUS.pending) {
                 this.status = STATUS.fulfilled
                 this.value = value
+                // 发布订阅模式
+                this.onResolveCallbacks.forEach(fn => fn())
             }
         }
         const reject = (reason?: any) => {
             if (this.status === STATUS.pending) {
                 this.status = STATUS.rejected
                 this.reason = reason
+                this.onRejectedCallbacks.forEach(fn => fn())
             }
         }
-        try{
+        try {
             executor(resolve, reject)
-        }catch(e){
+        } catch (e) {
             reject(e)
         }
     }
-    then(onFulfilled, onRejected){
-        if(this.status == STATUS.fulfilled){
-            onFulfilled(this.value)
-        }
-        if(this.status == STATUS.rejected){
-            onRejected(this.reason)
-        }
+    then(onFulfilled, onRejected) {
+        // 每次调用then都产生一个全新的promise
+        return new Promise((resolve, reject) => {
+            if (this.status == STATUS.fulfilled) {
+                try {
+                    resolve(onFulfilled(this.value)) // 用then的返回值 最为下次then的成功结果
+                } catch (e) {
+                    reject(e)
+                }
+            }
+            if (this.status == STATUS.rejected) {
+                try {
+                    resolve(onRejected(this.reason)) // 用then的返回值 最为下次then的成功结果
+                } catch (e) {
+                    reject(e)
+                }
+            }
+            if (this.status == STATUS.pending) {
+                // 订阅
+                this.onResolveCallbacks.push(() => {  // 切片
+                    // 可以增加额外逻辑
+                    try {
+                        resolve(onFulfilled(this.value)) // 用then的返回值 最为下次then的成功结果
+                    } catch (e) {
+                        reject(e)
+                    }
+                })
+                this.onRejectedCallbacks.push(() => {
+                    // 可以增加额外逻辑
+                    try {
+                        resolve(onRejected(this.reason)) // 用then的返回值 最为下次then的成功结果
+                    } catch (e) {
+                        reject(e)
+                    }
+                })
+            }
+        })
     }
 
 
