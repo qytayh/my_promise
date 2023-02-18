@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Title</title>
+    <script src="promise-class.js"></script>
+  </head>
+  <body>
+    <script>
+      let p = new Promise((resolve, reject) => {
+        setTimeout(()=>{
+          resolve(111);
+        },1)
+      });
+
+      p.then(
+        (value) => {
+          console.log(value);
+          throw '2222'
+        },
+        (reason) => {
+          console.log(reason);
+        }
+      ).catch(e=>{
+        console.log(e)
+      });
+
+      // console.log(r)
+    </script>
+  </body>
+</html>
